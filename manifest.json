@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "TrapSight",
+  "version": "1.0.0",
+  "description": "Expose hidden subscription traps, fees, and fine print in checkout summaries using Gemini AI.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "scraper.js",
+        "content.js"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
