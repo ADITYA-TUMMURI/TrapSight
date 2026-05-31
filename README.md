@@ -5,11 +5,11 @@
 **Read the fine print. We do it for you.**
 
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
-[![Gemini AI](https://img.shields.io/badge/Gemini-1.5%20Flash-10b981?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Gemini AI](https://img.shields.io/badge/Gemini-3.5%20Flash_lite-10b981?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Serverless](https://img.shields.io/badge/Serverless-Zero%20Backend-6366f1?style=for-the-badge)](https://github.com/ADITYA-TUMMURI/TrapSight)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-ef4444?style=for-the-badge)](LICENSE)
 
-A Chrome Extension that **intercepts checkout clicks** and uses **Gemini 1.5 Flash** to expose hidden fees, subscription traps, and dark patterns — before you pay.
+A Chrome Extension that **intercepts checkout clicks** and uses **Gemini 3.5 Flash lite** to expose hidden fees, subscription traps, and dark patterns — before you pay.
 
 </div>
 
@@ -29,7 +29,7 @@ TrapSight stops that. When you click any checkout button, TrapSight **freezes th
 
 2. **Smart Scraping** — `scraper.js` uses domain-specific CSS selectors to extract pricing text from the checkout page.
 
-3. **AI Analysis** — The extracted text is sent to **Gemini 1.5 Flash** via the Google AI Studio API. The model returns structured JSON with risk levels, hidden fees, and exact quotes from the page.
+3. **AI Analysis** — The extracted text is sent to **Gemini 3.5 Flash lite** via the Google AI Studio API. The model returns structured JSON with risk levels, hidden fees, and exact quotes from the page.
 
 4. **Risk Report** — A Shadow DOM widget overlays the page showing the breakdown: risk badge, fee math, warnings, and a "Read" button that scrolls to the exact line in the page that triggered the flag.
 
