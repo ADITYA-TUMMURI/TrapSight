@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrapSight - Premium UI/UX Sandbox Demo</title>
+  <!-- Modern clean typography -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --bg-card: #151c2e;
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --border: #242f49;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .demo-header {
+      text-align: center;
+      margin-bottom: 30px;
+      max-width: 600px;
+    }
+
+    .demo-header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a5b4fc, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    .demo-header p {
+      color: var(--text-sub);
+      font-size: 15px;
+    }
+
+    .checkout-container {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 30px;
+      max-width: 1000px;
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    @media (max-width: 768px) {
+      .checkout-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .checkout-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-section {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    .form-section:last-child {
+      border: none;
+      padding-bottom: 0;
+    }
+
+    .form-section h3 {
+      margin-bottom: 12px;
+      font-size: 18px;
+      color: #ffffff;
+    }
+
+    .input-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-wrapper label {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .input-wrapper input {
+      background: #0f1524;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: white;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrapper input:focus {
+      border-color: var(--primary);
+    }
+
+    /* Summary Card Styling */
+    .order-summary {
+      background: #0e1322;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-self: flex-start;
+      position: sticky;
+      top: 20px;
+    }
+
+    .order-summary h3 {
+      font-size: 20px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .summary-line {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: var(--text-sub);
+    }
+
+    .summary-line.total {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .terms-box {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--text-sub);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px dashed var(--border);
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    /* Hidden Terms selector to test highlighting */
+    .auto-renew-terms {
+      display: inline-block;
+      color: #818cf8;
+      cursor: help;
+      text-decoration: underline;
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    .btn-checkout {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      width: 100%;
+      text-align: center;
+      margin-top: 10px;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-checkout:hover {
+      background-color: var(--primary-hover);
+    }
+
+    .btn-checkout:active {
+      transform: scale(0.98);
+    }
+
+    /* Logger box for sandbox feedback */
+    .sandbox-logger {
+      margin-top: 30px;
+      max-width: 1000px;
+      width: 100%;
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+
+    .logger-header {
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logger-badge {
+      background: #312e81;
+      color: #a5b4fc;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .logger-content {
+      color: #10b981;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .logger-line {
+      margin-bottom: 4px;
+      color: var(--text-sub);
+    }
+
+    .logger-line.success {
+      color: #10b981;
+    }
+
+    .logger-line.info {
+      color: #6366f1;
+    }
+
+    .logger-line.warn {
+      color: #f59e0b;
+    }
+
+    .reset-banner {
+      margin-top: 15px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-reset {
+      background: #1f2937;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: #374151;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-header">
+    <h1>CloudFlow Pro Checkout</h1>
+    <p>Simulating an e-commerce subscription order. Press "Complete Purchase" below to trigger the TrapSight warning widget interception.</p>
+  </div>
+
+  <div class="checkout-container">
+    <div class="checkout-form">
+      <div class="form-section">
+        <h3>1. Billing Address</h3>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="fname">First Name</label>
+            <input type="text" id="fname" value="Alex">
+          </div>
+          <div class="input-wrapper">
+            <label for="lname">Last Name</label>
+            <input type="text" id="lname" value="Morgan">
+          </div>
+        </div>
+        <div class="input-wrapper">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" value="alex@example.com">
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>2. Payment Details</h3>
+        <div class="input-wrapper" style="margin-bottom: 12px;">
+          <label for="card">Card Number</label>
+          <input type="text" id="card" value="•••• •••• •••• 4242">
+        </div>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="expiry">Expiry Date</label>
+            <input type="text" id="expiry" value="12/28">
+          </div>
+          <div class="input-wrapper">
+            <label for="cvv">CVV</label>
+            <input type="text" id="cvv" value="987">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Summary Column -->
+    <div class="order-summary">
+      <h3>Order Summary</h3>
+      <div class="summary-line">
+        <span>CloudFlow Enterprise Plan</span>
+        <span>$19.99/mo</span>
+      </div>
+      <div class="summary-line">
+        <span>Setup & Onboarding</span>
+        <span>$15.00</span>
+      </div>
+      <div class="summary-line">
+        <span>Regulatory Recovery charge</span>
+        <span>$2.50/mo</span>
+      </div>
+      
+      <div class="terms-box">
+        By clicking Complete Purchase, you agree to our Terms of Service. 
+        Note that this subscription <span class="auto-renew-terms" id="terms-renew">automatically renews at the standard non-promotional price of $39.99/mo</span> after the initial 3-month onboarding period.
+      </div>
+
+      <div class="summary-line total">
+        <span>Due Today</span>
+        <span>$37.49</span>
+      </div>
+
+      <button class="btn-checkout" id="checkout-button">Complete Purchase</button>
+    </div>
+  </div>
+
+  <!-- Real-time Logger for demonstrating event callbacks -->
+  <div class="sandbox-logger">
+    <div class="logger-header">
+      <span>Event Interception Console</span>
+      <span class="logger-badge">Sandbox Engine</span>
+    </div>
+    <div class="logger-content" id="log-output">
+      <div class="logger-line info">[System] Sandbox initialized. Click "Complete Purchase" to test TrapSight.</div>
+    </div>
+  </div>
+
+  <div class="reset-banner">
+    <button class="btn-reset" id="reset-logs">Clear Log Console</button>
+    <button class="btn-reset" id="trigger-manual">Re-trigger TrapSight</button>
+  </div>
+
+  <!-- Injected Member 3 Script -->
+  <script src="widget/widget.js"></script>
+  
+  <script>
+    // Hardcoded JSON Contract (Exactly matching specifications in README)
+    const mockGeminiResponse = {
+      "hasHiddenFees": true,
+      "summaryMath": {
+        "basePrice": "$19.99/mo",
+        "hiddenCharges": [
+          {
+            "label": "Activation Fee",
+            "amount": "$15.00"
+          },
+          {
+            "label": "Regulatory Recovery Fee",
+            "amount": "$2.50/mo"
+          }
+        ],
+        "totalFirstYearCost": "$284.88"
+      },
+      "warnings": [
+        {
+          "severity": "high",
+          "message": "Auto-renews at full price of $39.99/mo after 3-month trial period.",
+          "domSelectorToHighlight": "#terms-renew"
+        }
+      ]
+    };
+
+    const logOutput = document.getElementById('log-output');
+    const checkoutBtn = document.getElementById('checkout-button');
+    const resetLogsBtn = document.getElementById('reset-logs');
+    const manualBtn = document.getElementById('trigger-manual');
+
+    function log(message, type = 'info') {
+      const line = document.createElement('div');
+      line.className = `logger-line ${type}`;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logOutput.appendChild(line);
+      logOutput.scrollTop = logOutput.scrollHeight;
+    }
+
+    // Instantiate TrapSightWidget (Member 3 component)
+    const trapsight = new TrapSightWidget(mockGeminiResponse, {
+      onDismiss: () => {
+        log('Action Triggered: Dismiss & Proceed. Direct checkout allowed.', 'success');
+      },
+      onCancel: () => {
+        log('Action Triggered: Cancel Checkout. User returned to safety.', 'warn');
+      }
+    });
+
+    // Intercept checkout click (Simulating Member 4 content script pipeline)
+    checkoutBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      log('Click intercepted! Calling e.preventDefault(). Starting pricing analysis...', 'info');
+      
+      // Simulate loading state of 600ms, then launch the widget
+      setTimeout(() => {
+        log('Analysis completed! Displaying TrapSight Warning Alert Overlay.', 'info');
+        trapsight.show();
+      }, 600);
+    });
+
+    // Manual manualBtn trigger
+    manualBtn.addEventListener('click', () => {
+      log('Manual override: Launching TrapSight widget.', 'info');
+      trapsight.show();
+    });
+
+    // Clear logs
+    resetLogsBtn.addEventListener('click', () => {
+      logOutput.innerHTML = '<div class="logger-line info">[System] Log console cleared.</div>';
+    });
+  </script>
+</body>
+</html>
