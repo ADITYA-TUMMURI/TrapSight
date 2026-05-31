@@ -107,6 +107,4 @@ The status badge turns green when your key is configured. Open `demo.html` for a
 
 **TrapSight** — *Stop paying for things you didn't agree to.*
 
-[![GitHub](https://img.shields.io/badge/View%20on-GitHub-18181b?style=for-the-badge&logo=github)](https://github.com/ADITYA-TUMMURI/TrapSight)
-
 </div>
