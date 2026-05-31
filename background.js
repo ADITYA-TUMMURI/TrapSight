@@ -1,47 +1,96 @@
 /**
  * TrapSight - Chrome Extension Service Worker (Manifest V3)
- * Senior Software Engineer resolved implementation connecting to Gemini 1.5 Flash API.
+ * 
+ * Functions as a serverless, secure AI router that communicates directly with the
+ * Google AI Studio Gemini API (gemini-3.1-flash-lite) using a Bring Your Own Key (BYOK)
+ * architecture. It processes scraped checkout page texts for dark patterns and hidden fees.
  */
 
-const GEMINI_API_KEY = "AQ.Ab8RN6IPLYdUN7s8qT_wm5nYcwzb5x5-kK-vhRWmWph8Bu2MTA";
+// Define standard storage keys and model identifier
+const API_KEY_STORAGE_KEYS = ['GEMINI_API_KEY', 'geminiApiKey'];
+const GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_API_VERSION = 'v1beta';
 
-const SYSTEM_PROMPT = `You are an isolated API endpoint evaluating consumer checkout traps and dark patterns. Your task is to analyze the provided checkout page text and identify any potential risks, deceptive patterns, or hidden fees.
+// Exact system prompt mandated by architectural instructions
+const SYSTEM_PROMPT = `You are a raw API endpoint parsing checkout page structures for dark patterns and deceptive pricing. Evaluate the text provided and return ONLY raw, valid JSON matching the required schema. Do not include markdown formatting, backticks, or conversational prose.`;
 
-You MUST return ONLY a raw, valid JSON object matching the following schema. Do NOT wrap the JSON in markdown code blocks or backticks (e.g., do NOT use \`\`\`json or \`\`\`). Do NOT include any additional conversational text, preambles, or postscripts.
+// Exact JSON schema contract requested by the user
+const RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    risk_level: {
+      type: "string",
+      enum: ["high", "medium", "low"]
+    },
+    hidden_fee: {
+      type: "string",
+      description: "Detected fee amount or 'none'"
+    },
+    summary: {
+      type: "string",
+      description: "Brief explanation of the risk, hidden fee, or deceptive practice"
+    },
+    line_content: {
+      type: "string",
+      description: "Exact string or sentence from the source text containing the trap to allow targeting"
+    }
+  },
+  required: ["risk_level", "hidden_fee", "summary", "line_content"]
+};
 
-Returned JSON Schema:
-{
-  "risk_level": "high/medium/low",
-  "hidden_fee": "detected fee amount or none",
-  "summary": "brief explanation"
-}`;
+// CSS selectors of common checkout elements to scroll/highlight as a fallback
+const FALLBACK_DOM_SELECTORS = [
+  '.checkout-summary', '.order-summary', '.pricing-breakdown', '.cart-totals',
+  '.subscription-details', '.billing-plan-details', '#plan-summary', '.checkout-bill',
+  '.pricing-details', '#cart-total', '.checkout-summary-container', '.fees-breakdown'
+].join(', ');
 
-// Listen for messages from the content script
+/**
+ * Service Worker Message Router
+ * Listens for scraped checkout page payloads sent from the content scripts.
+ */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "analyze_checkout") {
-    // Execute the async flow immediately and return true to keep the channel open
-    handleAnalyzeCheckout(message.text || "")
-      .then((parsedData) => {
-        sendResponse({ success: true, data: parsedData });
+  // Support both 'analyzeTerms' (sent by content.js) and 'analyze_checkout' (general integration compatibility)
+  if (message.action === 'analyzeTerms' || message.action === 'analyze_checkout') {
+    handleAnalyzeRequest(message.text || "")
+      .then((responsePayload) => {
+        sendResponse({ success: true, data: responsePayload });
       })
       .catch((error) => {
-        console.error("[TrapSight Background] Error during analysis:", error);
+        console.error('[TrapSight Service Worker] Error during checkout analysis:', error);
         sendResponse({ success: false, error: error.message });
       });
     
-    return true; // Keep the runtime message channel open for asynchronous response
+    // Return true to keep the message response channel open for async execution
+    return true;
   }
 });
 
 /**
- * Sends a client-side POST request directly to the Gemini 1.5 Flash API to analyze checkout terms.
- * Enforces structured JSON responses using the generationConfig and systemInstruction.
+ * Coordinates API key retrieval, Gemini API request, and response translation.
  * 
- * @param {string} textToAnalyze 
- * @returns {Promise<object>} Parsed JSON content returned by Gemini API
+ * @param {string} textToAnalyze - Scraped checkout page text.
+ * @returns {Promise<Object>} - Parsed and UI-compatible response object.
  */
-async function handleAnalyzeCheckout(textToAnalyze) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+async function handleAnalyzeRequest(textToAnalyze) {
+  // 1. Pull the user's custom API key from chrome.storage.local (supporting BYOK constraints)
+  const storageData = await new Promise((resolve) => {
+    chrome.storage.local.get(API_KEY_STORAGE_KEYS, (result) => {
+      resolve(result || {});
+    });
+  });
+
+  const apiKey = storageData.GEMINI_API_KEY || storageData.geminiApiKey;
+
+  // Throw clear error if no personal API key is configured
+  if (!apiKey) {
+    const missingKeyErrorMsg = 'Gemini API Key not found. Please click the extension icon to configure your personal Google AI Studio API Key.';
+    console.error(`[TrapSight Service Worker] API Key Error: ${missingKeyErrorMsg}`);
+    throw new Error(missingKeyErrorMsg);
+  }
+
+  // 2. Dispatch request directly to Google AI Studio developer API endpoint
+  const url = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [
@@ -61,7 +110,8 @@ async function handleAnalyzeCheckout(textToAnalyze) {
       ]
     },
     generationConfig: {
-      responseMimeType: "application/json"
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA
     }
   };
 
@@ -75,29 +125,56 @@ async function handleAnalyzeCheckout(textToAnalyze) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("[TrapSight Background] Direct Gemini API request failed:", errorText);
-    throw new Error(`Gemini API Request failed with status ${response.status}`);
+    console.error(`[TrapSight Service Worker] API request failed with status ${response.status}:`, errorText);
+    throw new Error(`Gemini API Request failed with status ${response.status}. Please check your key validity.`);
   }
 
-  const data = await response.json();
+  const responseJson = await response.json();
 
+  // Validate response integrity
   if (
-    !data.candidates ||
-    data.candidates.length === 0 ||
-    !data.candidates[0].content ||
-    !data.candidates[0].content.parts ||
-    data.candidates[0].content.parts.length === 0
+    !responseJson.candidates ||
+    responseJson.candidates.length === 0 ||
+    !responseJson.candidates[0].content ||
+    !responseJson.candidates[0].content.parts ||
+    responseJson.candidates[0].content.parts.length === 0
   ) {
-    throw new Error("Invalid response format or empty response from Gemini API");
+    throw new Error("Invalid response format received from the Gemini API.");
   }
 
-  const candidateText = data.candidates[0].content.parts[0].text;
+  const candidateText = responseJson.candidates[0].content.parts[0].text;
   
   try {
     const parsedData = JSON.parse(candidateText.trim());
-    return parsedData;
+    
+    // 3. Map/Augment the strict schema back to the UI structure expected by content.js
+    // This maintains perfect runtime compatibility while adhering strictly to the JSON contract.
+    let uiCompatibleData = { ...parsedData };
+
+    // If it adheres to the requested strict schema, augment with content.js rendering structures
+    if (parsedData.risk_level && !parsedData.warnings) {
+      const isFeeDetected = parsedData.hidden_fee && parsedData.hidden_fee.toLowerCase() !== 'none';
+      
+      uiCompatibleData.hasHiddenFees = isFeeDetected;
+      
+      uiCompatibleData.summaryMath = {
+        basePrice: "Calculated at checkout",
+        hiddenCharges: isFeeDetected ? [{ label: "Detected Hidden Fee", amount: parsedData.hidden_fee }] : [],
+        totalFirstYearCost: isFeeDetected ? `Base + ${parsedData.hidden_fee}` : "Base Price Only"
+      };
+
+      uiCompatibleData.warnings = [
+        {
+          severity: parsedData.risk_level.toLowerCase(),
+          message: parsedData.summary || "Potential pricing risk detected on this page.",
+          domSelectorToHighlight: FALLBACK_DOM_SELECTORS
+        }
+      ];
+    }
+
+    return uiCompatibleData;
   } catch (err) {
-    console.error("[TrapSight Background] Failed to parse candidate text as JSON:", candidateText, err);
-    throw new Error("Failed to parse pricing analysis as valid JSON");
+    console.error("[TrapSight Service Worker] Failed to parse candidate text as JSON:", candidateText, err);
+    throw new Error("Failed to parse dark pattern analysis as a valid JSON object.");
   }
 }
