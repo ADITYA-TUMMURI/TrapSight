@@ -1,109 +1,347 @@
-# TrapSight 👁️🔍
+<div align="center">
 
-> **TrapSight** is a premium, AI-powered Chrome extension designed to expose hidden traps, fine print, and deceptive pricing details in checkout forms. By intercepting the checkout flow, extracting pricing agreements, and analyzing them via the Gemini 1.5 Flash API, TrapSight translates complex legal jargon and subscription traps into simple, clear mathematics before the user completes their purchase.
+# 👁️ TrapSight
+
+**Your financial firewall at the point of sale.**
+
+[![Manifest V3](https://img.shields.io/badge/Manifest-V3-4f46e5?style=for-the-badge&logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/mv3/)
+[![Gemini AI](https://img.shields.io/badge/Powered%20by-Gemini%201.5%20Flash-10b981?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Serverless](https://img.shields.io/badge/Architecture-Serverless-6366f1?style=for-the-badge&logo=cloudflare&logoColor=white)](https://github.com/ADITYA-TUMMURI/TrapSight)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-ef4444?style=for-the-badge)](LICENSE)
+[![Next Byte Hacks V2](https://img.shields.io/badge/Built%20at-Next%20Byte%20Hacks%20V2-f59e0b?style=for-the-badge)](https://github.com/ADITYA-TUMMURI/TrapSight)
+
+> A serverless Manifest V3 Chrome Extension powered by **Gemini 1.5 Flash** that intercepts checkout clicks to expose predatory dark patterns, hidden fees, and deceptive subscription traps — before you click "Buy."
+
+</div>
 
 ---
 
-## 🏗️ Project Architecture & Data Flow
+## 📌 Table of Contents
 
-TrapSight is divided into four modular components, collaborated on by four development roles:
+- [Inspiration & Problem Statement](#-inspiration--problem-statement)
+- [Core Features](#-core-features)
+- [Technical Architecture & Data Pipeline](#-technical-architecture--data-pipeline)
+- [JSON Data Contract](#-json-data-contract)
+- [Repository Structure](#-repository-structure)
+- [Supported Sites](#-supported-sites)
+- [Installation & Setup](#-installation--setup)
+- [Team](#-team)
 
-```mermaid
-graph TD
-    A[Member 4: Content Script] -- 1. Intercepts Checkout Click --> B[Member 2: DOM Scraper]
-    B -- 2. Extracts Pricing Text --> A
-    A -- 3. Sends Payload --> C[Member 1: Background Service Worker & AI]
-    C -- 4. Calls Gemini 1.5 Flash API --> D[Gemini API]
-    D -- 5. Returns JSON Contract --> C
-    C -- 6. Routes JSON --> A
-    A -- 7. Triggers Render --> E[Member 3: UI Widget]
+---
+
+## 🔥 Inspiration & Problem Statement
+
+Every year, billions of dollars are extracted from consumers not through outright fraud, but through **calculated design deception**. The mechanisms are well-documented: a "monthly" price that requires a full annual commitment, a free trial that converts to a $180/year charge with zero friction, a domain checkout that bundles $40 of optional add-ons in pre-checked boxes, or a cancellation penalty buried in a wall of fine print nobody reads.
+
+These are not bugs. They are features — engineered by conversion-rate-optimization teams to exploit decision fatigue at the highest-intent moment in a user journey: **the checkout page**.
+
+Existing solutions fall into two failure modes:
+
+1. **Passive text highlighters** — tools that surface potentially suspicious words in DOM nodes are trivially defeated by obfuscated phrasing and do nothing to interrupt the user's forward momentum toward completing the purchase.
+2. **Server-dependent analyzers** — tools that route page content through a centralized backend introduce unacceptable privacy risks, latency, and a single point of failure for every user.
+
+**TrapSight rejects both models.** Instead, it enforces a single, inviolable design constraint: **just-in-time protective friction**. When a user moves to click any checkout, purchase, or subscribe button, TrapSight intercepts that event, extracts and analyzes the checkout text in real time against the Gemini AI, and presents a structured risk assessment — all before the original click is allowed to propagate. No server. No data retention. No compromise.
+
+---
+
+## ✨ Core Features
+
+### 🛑 Just-in-Time Interception
+TrapSight registers a capturing-phase `click` event listener on the `document` root. When the target matches a checkout-intent button (`checkout`, `buy`, `pay`, `subscribe`, `trial`, etc.), `e.preventDefault()` and `e.stopPropagation()` are called immediately, freezing the transaction. The original button click is only re-dispatched — via a clean `MouseEvent` with a `data-trapsight-approved` guard — **after** the user has reviewed the risk report and explicitly chosen to proceed.
+
+```js
+// content.js — Capturing-phase interceptor
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button, input[type="submit"], a, [role="button"]');
+  const isCheckout = ['checkout', 'proceed', 'buy', 'pay', 'order',
+                      'purchase', 'subscribe', 'trial', 'continue']
+                      .some(k => btn.innerText.trim().toLowerCase().includes(k));
+
+  if (isCheckout && !btn.dataset.trapsightApproved) {
+    e.preventDefault();
+    e.stopPropagation();
+    startTrapSight(btn); // → triggers scraper → AI analysis → widget render
+  }
+}, true); // `true` = capturing phase, fires before any page handler
 ```
 
-1. **User Clicks "Checkout"**: Member 4's content script intercepts the action and pauses the checkout process.
-2. **Scraping**: Member 2's scraping logic runs, targeting specific pricing elements in the DOM.
-3. **AI Processing**: Member 1's background service worker sends the text to the Gemini API and obtains a structured JSON response.
-4. **UI Warning**: Member 3's widget displays a modal freezing the page, showing the financial breakdown, and letting the user auto-scroll to the exact point of interest.
+### 🛡️ Isolated Shadow DOM UI Rendering
+The warning modal, loading spinner, and all associated CSS are mounted inside a **Shadow DOM** attached to a host element with `style.all = 'initial'`. This enforces a hard CSS isolation boundary: no host-page stylesheet — however aggressive its specificity — can bleed into or corrupt the TrapSight UI. The widget renders consistently and correctly on every supported domain.
+
+```js
+// content.js — Shadow root creation
+widgetContainer = document.createElement('div');
+widgetContainer.style.all = 'initial'; // Reset all inherited styles
+document.body.appendChild(widgetContainer);
+const shadow = widgetContainer.attachShadow({ mode: 'open' });
+// All UI nodes are appended to `shadow`, never to `document.body` directly
+```
+
+### 🔗 Deep-Link DOM Highlighting
+The AI response includes a `line_content` field: the exact verbatim string from the checkout page that triggered the risk flag. TrapSight's `findDOMSelectorForText()` function walks the live DOM to locate the smallest element whose text content contains this string, stamps it with a unique `trapsight-highlight-target-{n}` class, and returns the CSS selector. The widget's **"Read"** button uses this selector to auto-scroll the host page to the offending line and apply a visual highlight — linking the abstract warning directly to its source evidence.
+
+### 💾 Analysis Caching
+A `Map`-based in-memory cache keyed on the first 100 characters of the extracted text prevents redundant API calls during the same browser session. If the user closes and re-opens the widget on an unchanged page, the result is served instantly from cache.
+
+### 🔑 BYOK — Bring Your Own Key
+Zero telemetry. Zero backend. The user's Gemini API key is stored exclusively in `chrome.storage.local`, scoped to the extension's isolated storage partition. It never leaves the browser except as an `Authorization`-equivalent header on requests made directly to the Google AI Studio endpoint. The popup provides a real-time status indicator — green `● Key Configured` or red `● Key Not Configured` — so the user always knows the protection state at a glance.
 
 ---
 
-## 👥 Development Roles & Responsibilities
+## 🏗️ Technical Architecture & Data Pipeline
 
-### 🎯 Member 2: DOM Targeting (The Scraper) — *Your Role*
-As the scraper developer, you are responsible for safely and precisely extracting pricing text from the page. Your code lives within the extension's content execution environment and must satisfy:
-*   **Scope Restriction**: Limit scraping actions *exclusively* to the 3 target demo websites.
-*   **Extraction Accuracy**: Write optimized CSS selectors to extract only the pricing terms and summary containers (e.g., `document.querySelector('.checkout-summary').innerText`), avoiding unnecessary DOM noise.
-*   **Routing Logic**: Implement a clean `switch` statement or routing map matching the URL (`window.location.href`) to run the correct scraper.
-*   **Deliverable**: A modular, exportable JavaScript function (e.g., `scrapeCheckoutData()`) that can be executed dynamically by Member 4.
+TrapSight enforces a **100% decentralized, serverless footprint**. There is no relay server, no logging endpoint, and no intermediary of any kind. The data flow is entirely local-to-API:
 
-> [!TIP]
-> Keep selectors robust by targeting IDs or semantic wrapper classes (like `.checkout-summary`, `#cart-total`, `.subscription-details`) to prevent minor UI changes from breaking the scraper.
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        HOST CHECKOUT PAGE (DOM)                         │
+│                                                                         │
+│  User clicks "Checkout" button  ──►  e.preventDefault() fires          │
+└───────────────────────────────────────┬─────────────────────────────────┘
+                                        │  Checkout click intercepted
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  scraper.js  (Content Script, Layer 1)                                  │
+│                                                                         │
+│  Identifies domain → selects CSS route → queries pricing block nodes    │
+│  window.scrapeCheckoutData() returns { storeName, extractedText, ... }  │
+└───────────────────────────────────────┬─────────────────────────────────┘
+                                        │  { extractedText: "..." }
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  content.js  (Content Script, Layer 2 — Point-of-Sale Controller)       │
+│                                                                         │
+│  Checks in-memory Map cache → on miss: renders Shadow DOM loading modal │
+│  Sends chrome.runtime.sendMessage({ action: 'analyzeTerms', text })     │
+└───────────────────────────────────────┬─────────────────────────────────┘
+                                        │  chrome.runtime.sendMessage()
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  background.js  (MV3 Service Worker — Serverless AI Router)             │
+│                                                                         │
+│  1. chrome.storage.local.get() → retrieves geminiApiKey                 │
+│  2. Constructs POST to Gemini 1.5 Flash API                             │
+│  3. responseMimeType: "application/json" enforces strict schema output  │
+│  4. Validates response → JSON.parse() → sendResponse()                  │
+└───────────────────────────────────────┬─────────────────────────────────┘
+                                        │  HTTPS fetch (direct, no relay)
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Google AI Studio  ─  gemini-1.5-flash                                  │
+│                                                                         │
+│  Processes legal/pricing expert system prompt + extracted checkout text │
+│  Returns constrained JSON object (responseMimeType enforced)            │
+└───────────────────────────────────────┬─────────────────────────────────┘
+                                        │  Strict JSON schema response
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  content.js  (UI Render Phase)                                          │
+│                                                                         │
+│  Validates & normalizes AI response → constructs warnings[]             │
+│  findDOMSelectorForText() maps line_content → live DOM node selector    │
+│  Instantiates TrapSightWidget (widget/widget.js) inside Shadow DOM      │
+│  User chooses: [Proceed Anyway] → re-dispatch click │ [Cancel] → abort  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Why a Service Worker as the AI Router?
+
+Content scripts operate in a restricted context and cannot safely hold sensitive credentials. By delegating all API key retrieval and network requests to `background.js` (a MV3 Service Worker), TrapSight enforces a clean separation of concerns:
+
+| Concern | Handled by |
+|---|---|
+| DOM parsing & text extraction | `scraper.js` |
+| User interaction & UI rendering | `content.js` + `widget/` |
+| API key storage & AI network calls | `background.js` |
+| User key management | `popup.html` + `popup.js` |
 
 ---
 
-### 🧠 Member 1: Background Script & AI Engine
-*   **Setup**: Registers the service worker in `manifest.json`.
-*   **API Connection**: Integrates the Gemini 1.5 Flash API directly using the local free-tier key.
-*   **Prompting**: Implements a strict system prompt instructing the LLM to output a predictable JSON schema.
-*   **Routing**: Receives scraped text from Member 4, calls the Gemini API, and passes back the JSON response.
+## 📋 JSON Data Contract
 
----
+`background.js` requests a response with `responseMimeType: "application/json"`, instructing Gemini to produce only valid, parseable JSON conforming to the following schema. This is the **invariant contract** shared across all four team members and documented in `INTEGRATION_CONTRACTS.md`.
 
-### 🎨 Member 3: UI/UX (The Alert Widget)
-*   **Independent Build**: Builds the premium alert widget using a hardcoded JSON contract (simulating the Gemini response).
-*   **Widget Design**: Implements a premium, page-freezing alert widget that renders legal jargon as simple mathematical operations.
-*   **Action Logic**: Handles the "Read" button, scrolling the user to the highlighted target selector.
-*   **Deliverable**: Modular CSS styles and injection-ready HTML/JS components.
-
----
-
-### 🔌 Member 4: Content Script & Integration
-*   **Interception**: Listens to checkout or proceed buttons and calls `event.preventDefault()` to pause navigation.
-*   **Data Pipeline**: Runs Member 2's scraper, manages the message port to send data to Member 1, and handles loading states.
-*   **Rendering**: Receives the analysis JSON and mounts Member 3's UI widget to display the results.
-
----
-
-## 🛠️ Installation & Getting Started
-
-1.  **Clone the Repository**:
-    ```bash
-    git clone https://github.com/seeramsujay/clearer-terms.git
-    cd clearer-terms
-    ```
-2.  **Load the Extension in Chrome**:
-    *   Open Chrome and navigate to `chrome://extensions/`.
-    *   Enable **Developer mode** (toggle in the top-right corner).
-    *   Click **Load unpacked** in the top-left corner.
-    *   Select the `clearer-terms` folder.
-
----
-
-## 📋 JSON Contract Specification
-The Gemini API response processed by the background worker conforms to the following structure, which both the Scraper and the UI widget align with:
+**AI Response Payload (Full Schema):**
 
 ```json
 {
-  "hasHiddenFees": true,
+  "risk_level": "high | medium | low",
+  "summary": "2-sentence plain English breakdown of the risk",
+  "hidden_fee": "$XX.XX or 'none'",
+  "line_content": "Exact verbatim string from checkout text to highlight in DOM",
   "summaryMath": {
-    "basePrice": "$19.99/mo",
+    "basePrice": "$XX.XX/period",
     "hiddenCharges": [
-      {
-        "label": "Activation Fee",
-        "amount": "$15.00"
-      },
-      {
-        "label": "Regulatory Recovery Fee",
-        "amount": "$2.50/mo"
-      }
+      { "label": "Human-readable fee name", "amount": "$XX.XX" }
     ],
-    "totalFirstYearCost": "$284.88"
+    "totalFirstYearCost": "$XX.XX"
   },
   "warnings": [
     {
-      "severity": "high",
-      "message": "Auto-renews at full price of $39.99/mo after 3 months.",
-      "domSelectorToHighlight": ".auto-renew-terms"
+      "severity": "high | medium | low",
+      "message": "Human-readable warning string",
+      "domSelectorToHighlight": ".css-selector (resolved post-render)"
     }
   ]
 }
 ```
+
+**Message Bus Contract (Content Script → Service Worker):**
+
+```json
+{
+  "action": "analyzeTerms",
+  "text": "Raw extracted pricing text from the DOM..."
+}
+```
+
+**Scraper Return Contract (`window.scrapeCheckoutData()`):**
+
+```json
+{
+  "success": true,
+  "storeName": "Adobe Checkout",
+  "extractedText": "Raw pricing text...",
+  "scrapedAt": "2026-05-31T16:27:00.000Z"
+}
+```
+
+---
+
+## 📁 Repository Structure
+
+```
+TrapSight-ext/
+│
+├── manifest.json               # MV3 configuration: permissions, host_permissions,
+│                               # service worker declaration, and content script
+│                               # injection order (widget.js → scraper.js → content.js)
+│
+├── background.js               # ★ Serverless AI Service Worker Router
+│                               # Handles `analyzeTerms` messages; retrieves the
+│                               # Gemini API key from chrome.storage.local; constructs
+│                               # and executes the fetch() to Gemini 1.5 Flash;
+│                               # enforces responseMimeType JSON contract; returns
+│                               # parsed structured data to the content script.
+│
+├── scraper.js                  # ★ Domain-Aware DOM Parsing Engine
+│                               # IIFE that exposes window.scrapeCheckoutData().
+│                               # Maintains a routing table of CSS selectors keyed
+│                               # by domain (Namecheap, Adobe, Shopify). Extracts
+│                               # and returns raw pricing text for AI consumption.
+│
+├── content.js                  # ★ Point-of-Sale Interceptor & UI Controller
+│                               # Registers the capturing-phase click interceptor;
+│                               # manages the analysis cache; renders the Shadow DOM
+│                               # loading modal; coordinates the scraper → AI →
+│                               # widget pipeline; implements findDOMSelectorForText()
+│                               # for deep-link DOM highlighting.
+│
+├── popup.html                  # Extension popup: premium dark-mode settings UI
+│                               # with Indigo/Inter design system. Renders the API
+│                               # key input, save button, and live status badge.
+│
+├── popup.js                    # Popup logic: reads/writes geminiApiKey to
+│                               # chrome.storage.local; updates the live status
+│                               # indicator between "Key Configured" and
+│                               # "Key Not Configured" states.
+│
+├── widget/
+│   ├── widget.js               # ★ Premium TrapSightWidget Class
+│   │                           # Class-based, fully self-contained widget renderer.
+│   │                           # Accepts the AI data object and renders the full
+│   │                           # risk report card — risk badge, summaryMath breakdown,
+│   │                           # warnings list, and action buttons — inside a
+│   │                           # Shadow DOM context.
+│   │
+│   └── widget.css              # Widget stylesheet: scoped design tokens, risk-level
+│                               # color semantics (red/amber/green), animations,
+│                               # and premium glassmorphism card styles.
+│
+├── demo.html                   # Standalone browser demo simulating a checkout page
+│                               # for local testing and presentation without requiring
+│                               # a live e-commerce site.
+│
+└── INTEGRATION_CONTRACTS.md    # Formal cross-team data contracts defining the
+                                # exact JSON schemas and function signatures for
+                                # all inter-module communication boundaries.
+```
+
+---
+
+## 🌐 Supported Sites
+
+TrapSight is currently configured for three primary demo targets, reflecting common dark-pattern vectors:
+
+| Domain | Store Context | Key Dark Pattern Risk |
+|---|---|---|
+| `namecheap.com` | Domain & Hosting Checkout | Pre-selected add-ons, privacy protection upsells |
+| `adobe.com` | Creative Cloud Subscription | Annual plan disguised as monthly, early termination fees |
+| `*.myshopify.com` | Generic E-commerce Checkout | Subscription traps, hidden processing fees |
+
+> **Extending coverage** is straightforward: add a new entry to the `SCRAPER_ROUTES` object in `scraper.js` with the domain hostname and its relevant CSS selectors, then register the matching `matches` pattern and `host_permissions` URL in `manifest.json`.
+
+---
+
+## ⚡ Installation & Setup
+
+TrapSight requires **no build step, no `npm install`, and no server**. Load it directly as an unpacked extension in under two minutes.
+
+### Prerequisites
+
+- Google Chrome (or any Chromium-based browser)
+- A free **Google AI Studio** API key — get one at [aistudio.google.com](https://aistudio.google.com/app/apikey)
+
+### Step 1 — Clone the Repository
+
+```bash
+git clone https://github.com/ADITYA-TUMMURI/TrapSight.git
+cd TrapSight
+```
+
+### Step 2 — Load the Extension into Chrome
+
+1. Open Chrome and navigate to `chrome://extensions`
+2. Enable **Developer Mode** using the toggle in the top-right corner
+3. Click **"Load unpacked"**
+4. Select the root `TrapSight-ext/` directory (the folder containing `manifest.json`)
+
+The TrapSight shield icon will appear in your Chrome toolbar.
+
+### Step 3 — Configure Your API Key
+
+1. Click the **TrapSight 👁️** icon in the Chrome toolbar to open the popup
+2. Paste your Google AI Studio API key into the **"Gemini API Key"** field
+3. Click **"Save API Key"**
+4. The status badge will turn green: `● Key Configured`
+
+Your key is stored exclusively in `chrome.storage.local` — it is never transmitted to any server other than `generativelanguage.googleapis.com` directly from your browser.
+
+### Step 4 — Test the Extension
+
+Navigate to any supported checkout page (e.g., a Shopify store checkout, Adobe.com plan selection, or Namecheap domain cart) and click any **"Checkout"**, **"Subscribe"**, or **"Buy Now"** button. TrapSight will intercept the click, analyze the page, and display its risk report before allowing the transaction to proceed.
+
+For a quick local test without a live site, open `demo.html` directly in your browser.
+
+---
+
+## 👥 Team
+
+Built in **72 hours** at **Next Byte Hacks V2** by a team of four engineers.
+
+| Role | Focus Area |
+|---|---|
+| **Member 1** | Serverless AI Engine — `background.js`, Gemini API integration, JSON schema contract |
+| **Member 2** | DOM Scraping Engine — `scraper.js`, CSS selector routing table, text extraction logic |
+| **Member 3** | Widget UI System — `widget/widget.js`, `widget/widget.css`, Shadow DOM rendering |
+| **Member 4** | Integration & Orchestration — `content.js`, cross-module contracts, `INTEGRATION_CONTRACTS.md` |
+
+---
+
+<div align="center">
+
+**TrapSight** — *Read the fine print. We do it for you.*
+
+[![GitHub](https://img.shields.io/badge/View%20on-GitHub-18181b?style=for-the-badge&logo=github)](https://github.com/ADITYA-TUMMURI/TrapSight)
+
+</div>
