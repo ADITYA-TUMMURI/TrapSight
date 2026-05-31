@@ -3,7 +3,7 @@
  * Senior Software Engineer resolved implementation connecting to Gemini 1.5 Flash API.
  */
 
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
+const GEMINI_API_KEY = "AQ.Ab8RN6IPLYdUN7s8qT_wm5nYcwzb5x5-kK-vhRWmWph8Bu2MTA";
 
 const SYSTEM_PROMPT = `You are an isolated API endpoint evaluating consumer checkout traps and dark patterns. Your task is to analyze the provided checkout page text and identify any potential risks, deceptive patterns, or hidden fees.
 
