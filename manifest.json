@@ -19,7 +19,7 @@
     {
       "matches": [
         "https://www.namecheap.com/*",
-        "https://www.adobe.com/*",
+        "https://*.adobe.com/*",
         "https://*.myshopify.com/*"
       ],
       "js": ["widget/widget.js", "scraper.js", "content.js"]

@@ -15,7 +15,7 @@
     if (!btn) return;
 
     const text = btn.innerText.trim().toLowerCase();
-    const isCheckout = ['checkout', 'proceed', 'buy', 'pay', 'order', 'purchase'].some(k => text.includes(k));
+    const isCheckout = ['checkout', 'proceed', 'buy', 'pay', 'order', 'purchase', 'subscribe'].some(k => text.includes(k));
 
     if (isCheckout && !btn.dataset.trapsightApproved) {
       e.preventDefault();

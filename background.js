@@ -3,7 +3,7 @@
  * Uses Gemini 1.5 Flash for rapid, accurate analysis.
  */
 
-const API_KEY_STORAGE_KEYS = ['GEMINI_API_KEY', 'geminiApiKey'];
+const API_KEY_STORAGE_KEYS = ['geminiApiKey'];
 const GEMINI_MODEL = 'gemini-1.5-flash';
 
 const SYSTEM_PROMPT = `You are a legal and pricing expert. Analyze the provided checkout text for hidden fees, auto-renewal traps, or predatory subscriptions. 
