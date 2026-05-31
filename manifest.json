@@ -1,23 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "TrapSight",
+  "name": "TrustGuard (TrapSight)",
   "version": "1.0.0",
-  "description": "Chrome extension utilizing gemini-3.1-flash-lite to identify dark patterns and hidden fees on checkout pages.",
+  "description": "Just-in-time protection from predatory subscriptions using Gemini 1.5 Flash.",
   "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://www.namecheap.com/*",
+    "https://www.adobe.com/*",
+    "https://*.myshopify.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["scraper.js", "content.js"]
+      "matches": [
+        "https://www.namecheap.com/*",
+        "https://www.adobe.com/*",
+        "https://*.myshopify.com/*"
+      ],
+      "js": ["widget/widget.js", "scraper.js", "content.js"]
     }
   ],
   "action": {

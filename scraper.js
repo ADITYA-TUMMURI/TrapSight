@@ -1,111 +1,64 @@
 /**
- * TrapSight - Member 2: DOM Scraper Module
- * 
- * Exposes a global window.scrapeCheckoutData() function for Member 4 (Content Script)
- * to run when the user attempts to proceed to checkout.
+ * TrapSight - FINAL SCRAPER (Member 2 & 4)
+ * Accurate selectors for the 3 Demo Sites.
  */
 (function () {
   'use strict';
 
-  // Config mapping for target domains and their respective pricing CSS selectors
   const SCRAPER_ROUTES = {
-    'demo-store-1.com': {
-      storeName: 'Demo Store 1 (e.g., General E-commerce)',
+    'namecheap.com': {
+      storeName: 'Namecheap (Domain Checkout)',
       selectors: [
-        '.checkout-summary',
-        '.order-summary',
-        '.pricing-breakdown',
-        '.cart-totals'
+        '.checkout-summary', 
+        '.cart-totals',      
+        '.order-review'      
       ]
     },
-    'demo-store-2.com': {
-      storeName: 'Demo Store 2 (e.g., Subscription Service)',
+    'adobe.com': {
+      storeName: 'Adobe (Creative Cloud)',
       selectors: [
-        '.subscription-details',
+        '.subscription-details', 
         '.billing-plan-details',
-        '#plan-summary',
-        '.checkout-bill'
+        '#plan-summary-container'
       ]
     },
-    'demo-store-3.com': {
-      storeName: 'Demo Store 3 (e.g., SaaS Platform)',
+    'myshopify.com': {
+      storeName: 'Shopify Checkout',
       selectors: [
-        '.pricing-details',
-        '#cart-total',
-        '.checkout-summary-container',
-        '.fees-breakdown'
+        '.order-summary', 
+        '.total-line-table',
+        '[data-order-summary]' 
       ]
     }
   };
 
-  /**
-   * Identifies the target website, runs the appropriate CSS selectors to
-   * extract checkout pricing details, and cleans up the resulting text.
-   * 
-   * @returns {Object|null} Scrape result object, or null if the page is out of scope.
-   */
   function scrapeCheckoutData() {
-    const url = window.location.href;
     const hostname = window.location.hostname;
+    let config = null;
 
-    // 1. Routing Logic: Find matched configuration based on URL hostname
-    let matchedDomain = null;
-    for (const domain in SCRAPER_ROUTES) {
-      if (hostname === domain || hostname.endsWith('.' + domain)) {
-        matchedDomain = domain;
-        break;
-      }
-    }
+    if (hostname.includes('namecheap')) config = SCRAPER_ROUTES['namecheap.com'];
+    else if (hostname.includes('adobe')) config = SCRAPER_ROUTES['adobe.com'];
+    else if (hostname.includes('myshopify')) config = SCRAPER_ROUTES['myshopify.com'];
 
-    if (!matchedDomain) {
-      console.log(`[TrapSight Scraper] Hostname "${hostname}" is out of scope. Skipping extraction.`);
-      return null;
-    }
+    if (!config) return null;
 
-    const config = SCRAPER_ROUTES[matchedDomain];
-    let extractedText = '';
-    let selectorUsed = '';
-
-    // 2. Extraction Logic: Try selectors sequentially
+    let extractedText = "";
     for (const selector of config.selectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        const rawText = element.innerText || element.textContent || '';
-        extractedText = rawText
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0)
-          .join('\n');
-        
-        selectorUsed = selector;
-        break; // Stop at first successful match
+      const el = document.querySelector(selector);
+      if (el) {
+        extractedText += el.innerText + "\n";
       }
     }
 
-    // 3. Prepare payload for Member 4
-    if (!extractedText) {
-      console.warn(`[TrapSight Scraper] Matched domain "${matchedDomain}" but failed to locate any pricing selector.`);
-      return {
-        success: false,
-        domain: matchedDomain,
-        storeName: config.storeName,
-        url: url,
-        error: 'Pricing container not found in DOM'
-      };
-    }
+    if (extractedText.length < 50) return null;
 
-    console.log(`[TrapSight Scraper] Successfully extracted terms from "${matchedDomain}" using selector "${selectorUsed}".`);
     return {
       success: true,
-      domain: matchedDomain,
       storeName: config.storeName,
-      url: url,
-      selectorUsed: selectorUsed,
-      extractedText: extractedText,
+      extractedText: extractedText.trim(),
       scrapedAt: new Date().toISOString()
     };
   }
 
-  // Expose function globally to the content script environment
   window.scrapeCheckoutData = scrapeCheckoutData;
 })();
