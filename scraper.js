@@ -15,11 +15,15 @@
       ]
     },
     'adobe.com': {
-      storeName: 'Adobe (Creative Cloud)',
+      storeName: 'Adobe Checkout',
       selectors: [
         '.subscription-details', 
         '.billing-plan-details',
-        '#plan-summary-container'
+        '#plan-summary-container',
+        '.order-summary',
+        '.cart-summary',
+        'aside',
+        '[role="complementary"]'
       ]
     },
     'myshopify.com': {

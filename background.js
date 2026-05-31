@@ -22,19 +22,24 @@ Structure:
 }`;
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'analyzeTerms' || message.action === 'analyze_checkout') {
+  if (message.action === 'analyzeTerms') {
     handleAnalysis(message.text)
       .then(data => sendResponse({ success: true, data }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
+      .catch(err => {
+        console.error("AI Error:", err);
+        sendResponse({ success: false, error: err.message });
+      });
     return true;
   }
 });
 
 async function handleAnalysis(text) {
-  const storage = await chrome.storage.local.get(API_KEY_STORAGE_KEYS);
-  const apiKey = storage.GEMINI_API_KEY || storage.geminiApiKey;
+  const storage = await chrome.storage.local.get(null); // Get all storage to be safe
+  const apiKey = storage.geminiApiKey || storage.GEMINI_API_KEY;
 
   if (!apiKey) throw new Error("API Key missing. Click extension icon to set it.");
+
+  console.log("TrustGuard: Sending request to Gemini...");
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
   
