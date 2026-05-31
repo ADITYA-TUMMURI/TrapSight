@@ -1,69 +1,47 @@
 /**
- * TrapSight - Member 1: Background Script & AI Engine
- * 
- * Handles message routing from the Content Script (Member 4), connects to
- * the Gemini 1.5 Flash API, and manages API keys securely.
+ * TrapSight - Chrome Extension Service Worker (Manifest V3)
+ * Senior Software Engineer resolved implementation connecting to Gemini 1.5 Flash API.
  */
 
-// Fallback API Key for development purposes. Replace with your key,
-// or configure it through the extension popup.
-const DEFAULT_GEMINI_KEY = '';
+const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
 
-const SYSTEM_PROMPT = `
-You are an expert contract analysis AI specializing in exposing consumer checkout traps and dark patterns.
-You will analyze the scraped checkout pricing terms and find:
-1. Hidden fees (e.g., activation fees, service charges, recovery fees).
-2. Deceptive subscription auto-renewals (e.g., free trials that renew at full cost).
-3. Complex legal pricing terms that you will translate into simple math.
+const SYSTEM_PROMPT = `You are an isolated API endpoint evaluating consumer checkout traps and dark patterns. Your task is to analyze the provided checkout page text and identify any potential risks, deceptive patterns, or hidden fees.
 
-Analyze the input text and construct a valid JSON response matching this schema:
+You MUST return ONLY a raw, valid JSON object matching the following schema. Do NOT wrap the JSON in markdown code blocks or backticks (e.g., do NOT use \`\`\`json or \`\`\`). Do NOT include any additional conversational text, preambles, or postscripts.
+
+Returned JSON Schema:
 {
-  "hasHiddenFees": boolean,
-  "summaryMath": {
-    "basePrice": "the upfront base cost or recurring base cost (e.g., '$19.99/mo', '$0.00')",
-    "hiddenCharges": [
-      {
-        "label": "The name of the charge (e.g., 'Regulatory Fee')",
-        "amount": "The amount (e.g., '$2.50/mo' or '$15.00 one-time')"
-      }
-    ],
-    "totalFirstYearCost": "Calculate the estimated total cost for the first 12 months, including base price and all fees (e.g., '$284.88')"
-  },
-  "warnings": [
-    {
-      "severity": "high" | "medium" | "low",
-      "message": "A concise explanation of the trap or warning (e.g., 'Auto-renews at full price after 3 months.')",
-      "domSelectorToHighlight": "A generic, common CSS selector matching the pricing line in typical checkouts if mentioned, or empty string."
-    }
-  ]
-}
+  "risk_level": "high/medium/low",
+  "hidden_fee": "detected fee amount or none",
+  "summary": "brief explanation"
+}`;
 
-CRITICAL RULES:
-- Return ONLY the raw JSON string. Do NOT wrap it in markdown code blocks like \`\`\`json.
-- If there are no hidden charges, set "hasHiddenFees" to false and leave "hiddenCharges" empty.
-- Ensure all numbers are calculated correctly.
-`;
-
+// Listen for messages from the content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'analyzeTerms') {
-    handleAnalysis(message.text)
-      .then(result => sendResponse({ success: true, data: result }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
+  if (message.action === "analyze_checkout") {
+    // Execute the async flow immediately and return true to keep the channel open
+    handleAnalyzeCheckout(message.text || "")
+      .then((parsedData) => {
+        sendResponse({ success: true, data: parsedData });
+      })
+      .catch((error) => {
+        console.error("[TrapSight Background] Error during analysis:", error);
+        sendResponse({ success: false, error: error.message });
+      });
     
-    return true; // Keep message channel open for asynchronous reply
+    return true; // Keep the runtime message channel open for asynchronous response
   }
 });
 
-async function handleAnalysis(textToAnalyze) {
-  // 1. Get the API Key from local storage, with fallback to the local variable
-  const storage = await chrome.storage.local.get(['geminiApiKey']);
-  const apiKey = storage.geminiApiKey || DEFAULT_GEMINI_KEY;
-
-  if (!apiKey) {
-    throw new Error('Gemini API Key is not configured. Please open the extension popup and enter your key.');
-  }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+/**
+ * Sends a client-side POST request directly to the Gemini 1.5 Flash API to analyze checkout terms.
+ * Enforces structured JSON responses using the generationConfig and systemInstruction.
+ * 
+ * @param {string} textToAnalyze 
+ * @returns {Promise<object>} Parsed JSON content returned by Gemini API
+ */
+async function handleAnalyzeCheckout(textToAnalyze) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
   const requestBody = {
     contents: [
@@ -88,28 +66,38 @@ async function handleAnalysis(textToAnalyze) {
   };
 
   const response = await fetch(url, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json'
+      "Content-Type": "application/json"
     },
     body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[TrapSight Background] API Error response:', errorText);
+    console.error("[TrapSight Background] Direct Gemini API request failed:", errorText);
     throw new Error(`Gemini API Request failed with status ${response.status}`);
   }
 
-  const jsonResponse = await response.json();
+  const data = await response.json();
+
+  if (
+    !data.candidates ||
+    data.candidates.length === 0 ||
+    !data.candidates[0].content ||
+    !data.candidates[0].content.parts ||
+    data.candidates[0].content.parts.length === 0
+  ) {
+    throw new Error("Invalid response format or empty response from Gemini API");
+  }
+
+  const candidateText = data.candidates[0].content.parts[0].text;
   
-  // Extract and parse the generated content from response structure
   try {
-    const candidateText = jsonResponse.candidates[0].content.parts[0].text;
     const parsedData = JSON.parse(candidateText.trim());
     return parsedData;
   } catch (err) {
-    console.error('[TrapSight Background] Failed to parse AI output:', err, jsonResponse);
-    throw new Error('Failed to parse AI pricing analysis output.');
+    console.error("[TrapSight Background] Failed to parse candidate text as JSON:", candidateText, err);
+    throw new Error("Failed to parse pricing analysis as valid JSON");
   }
 }
