@@ -69,6 +69,7 @@
     // 2. Extraction Logic: Try selectors sequentially
     for (const selector of config.selectors) {
       const element = document.querySelector(selector);
+      if (element) {
         const rawText = element.innerText || element.textContent || '';
         extractedText = rawText
           .split('\n')
